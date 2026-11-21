@@ -8,10 +8,10 @@ follow-up questions.
 from __future__ import annotations
 
 from .claude_client import ClaudeClient
-from .models import ItemCondition, ListingFields, PriceSuggestion, RawItemInput
+from .models import VINTED_TOP_LEVEL_CATEGORIES, ItemCondition, ListingFields, PriceSuggestion, RawItemInput
 
-_SYSTEM_PROMPT = """\
-Du hilfst dabei, ein Secondhand-Kleidungsstück für ein Vinted-Angebot zu beschreiben.
+_SYSTEM_PROMPT = f"""\
+Du hilfst dabei, einen Secondhand-Artikel für ein Vinted-Angebot zu beschreiben.
 Du bekommst Fotos des Artikels und ein paar grobe Notizen des Verkäufers.
 
 Fülle alle Felder so vollständig und präzise wie möglich aus, damit Käufer möglichst
@@ -19,18 +19,22 @@ wenig Nachfragen haben. Sei ehrlich bei Mängeln (Flecken, Abnutzung, fehlende T
 nenne sie konkret, beschönige nichts. Wenn du dir bei etwas (z.B. Marke, Material)
 nicht sicher bist, schreibe das vorsichtiger ("vermutlich", "ca.") statt es zu erfinden.
 
+Die Kategorie ist ein Pfad durch Vinteds Kategorie-Auswahl, nicht ein freier Text.
+Die oberste Ebene ist einer von: {", ".join(VINTED_TOP_LEVEL_CATEGORIES)}.
+Gib so viele weitere Ebenen wie plausibel an (z.B. ["Damen", "Pullover & Strickjacken"]).
+
 Antworte NUR mit einem JSON-Objekt in diesem Format:
-{
+{{
   "title": "kurzer, präziser Titel",
   "description": "vollständige Beschreibung inkl. Zustand, Passform, Maße falls erkennbar, Mängel",
-  "category": "z.B. 'Damen > Pullover'",
-  "brand": "Marke oder null, wenn nicht erkennbar",
-  "size": "Größe oder null, wenn nicht erkennbar",
-  "color": "Hauptfarbe",
-  "condition": "einer von: new_with_tags, new_without_tags, very_good, good, satisfactory",
-  "material": "Material oder null, wenn nicht erkennbar",
+  "category": ["Damen", "Pullover & Strickjacken"],
+  "brand": "Marke oder null, wenn nicht erkennbar oder nicht zutreffend",
+  "size": "Größe oder null, wenn nicht erkennbar oder nicht zutreffend",
+  "color": "Hauptfarbe oder null, wenn nicht zutreffend",
+  "condition": "einer von: new_with_tags, new_without_tags, very_good, good, satisfactory, oder null wenn nicht zutreffend",
+  "material": "Material oder null, wenn nicht erkennbar oder nicht zutreffend",
   "flaws_disclosed": ["Liste konkreter Mängel, leer wenn keine erkennbar"]
-}
+}}
 """
 
 
@@ -52,20 +56,27 @@ def generate_listing(
         photo_paths=raw.photo_paths,
     )
 
-    try:
-        condition = ItemCondition(data["condition"])
-    except (KeyError, ValueError):
-        condition = ItemCondition.GOOD
+    condition = None
+    if data.get("condition"):
+        try:
+            condition = ItemCondition(data["condition"])
+        except ValueError:
+            condition = ItemCondition.GOOD
+
+    category = data.get("category") or []
+    if isinstance(category, str):
+        # Be lenient if the model ever replies with "Damen > Pullover" style text.
+        category = [part.strip() for part in category.split(">") if part.strip()]
 
     return ListingFields(
         title=data.get("title", "").strip(),
         description=data.get("description", "").strip(),
-        category=data.get("category", "").strip(),
+        category=category,
+        price_eur=price.suggested_price_eur,
         brand=data.get("brand") or None,
         size=data.get("size") or None,
-        color=data.get("color", "").strip(),
+        color=(data.get("color") or None) and data["color"].strip(),
         condition=condition,
         material=data.get("material") or None,
-        price_eur=price.suggested_price_eur,
         flaws_disclosed=list(data.get("flaws_disclosed") or []),
     )

@@ -11,7 +11,7 @@ from __future__ import annotations
 from .claude_client import ClaudeClient
 from .config import BusinessRules, DEFAULT_RULES
 from .discounts import evaluate_discount_request
-from .models import AgentDecision, IncomingMessage, Listing
+from .models import AgentDecision, IncomingMessage, IncomingOffer, Listing
 
 _CLASSIFY_SYSTEM_PROMPT = """\
 Du analysierst eine Käufer-Nachricht zu einem Vinted-Angebot. Dir liegt die
@@ -41,6 +41,58 @@ die genau diesen bereits entschiedenen Rabatt kommuniziert. Erfinde keine
 zusätzlichen Zusagen oder Zahlen. Keine Anrede/Signatur, nur der Nachrichtentext.
 """
 
+_PHRASE_OFFER_RESPONSE_SYSTEM_PROMPT = """\
+Formuliere eine kurze, freundliche Vinted-Nachricht auf Deutsch, die ein über
+die "Verhandeln"-Funktion eingegangenes Preisangebot begleitet. Nenne nur die
+bereits entschiedene Zahl, erfinde nichts dazu. Keine Anrede/Signatur, nur der
+Nachrichtentext.
+"""
+
+
+def handle_incoming_offer(
+    listing: Listing,
+    offer: IncomingOffer,
+    claude: ClaudeClient,
+    rules: BusinessRules = DEFAULT_RULES,
+) -> AgentDecision:
+    """Decide how to react to a structured price offer from Vinted's own
+    "Verhandeln" flow (a concrete number, not a chat message).
+
+    Note: this only computes the decision (accept at offer.offered_price_eur,
+    accept at a floor-clamped counter price, or escalate). Actually clicking
+    Accept/Decline/Counter in Vinted's UI is part of the not-yet-built
+    automation layer.
+    """
+
+    fields = listing.fields
+    decision = evaluate_discount_request(
+        current_price_eur=fields.price_eur,
+        rules=rules,
+        requested_price_eur=offer.offered_price_eur,
+    )
+
+    if decision.escalate:
+        return AgentDecision(
+            auto_reply_text=None,
+            discount_offered_rate=None,
+            escalate_to_seller=True,
+            escalation_reason=decision.reason,
+        )
+
+    reply = claude.text_request(
+        system=_PHRASE_OFFER_RESPONSE_SYSTEM_PROMPT,
+        user_text=(
+            f"Käufer hat {offer.offered_price_eur:.2f} € geboten (Artikelpreis: "
+            f"{fields.price_eur:.2f} €). Entschiedener Preis: "
+            f"{decision.offered_price_eur:.2f} €. Grund intern: {decision.reason}"
+        ),
+    )
+    return AgentDecision(
+        auto_reply_text=reply,
+        discount_offered_rate=decision.offered_rate,
+        escalate_to_seller=False,
+    )
+
 
 def handle_incoming_message(
     listing: Listing,
@@ -50,11 +102,13 @@ def handle_incoming_message(
     already_offered_rate: float = 0.0,
 ) -> AgentDecision:
     fields = listing.fields
+    condition_label = fields.condition.value if fields.condition else "nicht angegeben"
     context = (
         f"Artikel: {fields.title}\n"
+        f"Kategorie: {' > '.join(fields.category)}\n"
         f"Beschreibung: {fields.description}\n"
         f"Marke: {fields.brand}, Größe: {fields.size}, Farbe: {fields.color}, "
-        f"Zustand: {fields.condition.value}, Material: {fields.material}\n"
+        f"Zustand: {condition_label}, Material: {fields.material}\n"
         f"Bekannte Mängel: {', '.join(fields.flaws_disclosed) or 'keine'}\n"
         f"Aktueller Preis: {fields.price_eur:.2f} €\n\n"
         f"Käufer-Nachricht: {message.text}"

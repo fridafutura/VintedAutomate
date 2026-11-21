@@ -63,3 +63,13 @@ def test_requesting_both_rate_and_price_is_rejected():
 def test_requesting_neither_rate_nor_price_is_rejected():
     with pytest.raises(ValueError):
         evaluate_discount_request(10.0, RULES)
+
+
+def test_structured_offer_reuses_same_floor_and_cap_logic():
+    # A Vinted "Verhandeln" offer is just requested_price_eur under the hood.
+    low_offer = evaluate_discount_request(20.0, RULES, requested_price_eur=19.0)
+    assert low_offer.approved
+    assert low_offer.offered_price_eur == 19.0
+
+    too_low_offer = evaluate_discount_request(20.0, RULES, requested_price_eur=5.0)
+    assert too_low_offer.escalate

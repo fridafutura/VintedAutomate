@@ -27,6 +27,20 @@ Prüf außerdem, ob Vinted inzwischen eine eigene "Rabatt für Leute, die
 gefallen hat"-Funktion anbietet - falls ja, wäre das risikofreier als ein
 Nachbau.
 
+### Bestätigt aus echten Vinted-Screenshots
+
+- Das "Artikel verkaufen"-Formular ist: Fotos → Titel → Beschreibung →
+  Kategorie (hierarchische Auswahl, z.B. Damen → Pullover & Strickjacken) →
+  Preis. Felder wie Marke/Größe/Farbe/Zustand/Material tauchen erst nach der
+  Kategoriewahl auf und unterscheiden sich je nach Kategorie - deshalb sind
+  sie in `ListingFields` optional.
+- Vinted hat ein **eingebautes strukturiertes Preisangebot** ("Verhandeln"-
+  Button auf der Artikelseite): Käufer geben eine konkrete Zahl ein, kein
+  Freitext. Das ist ein eigener Kanal neben dem normalen Chat und wird in
+  `message_handler.handle_incoming_offer()` behandelt - mit derselben
+  Rabatt-Engine wie Chat-Rabattwünsche, nur ohne Intent-Klassifizierung
+  (die Zahl ist ja schon da).
+
 ## Geschäftsregeln (`config.py`)
 
 | Regel | Wert | Wo |
@@ -48,7 +62,7 @@ durchgesetzt, unabhängig davon, was das LLM vorschlägt.
 - `discounts.py` - Rabatt-Entscheidungslogik, inkl. Preisuntergrenzen-Clamping
 - `claude_client.py` - dünner Wrapper um die Anthropic-API (Vision + Text)
 - `listing_generator.py` - Fotos + Notizen → vollständige Angebotsfelder
-- `message_handler.py` - Käufer-Nachricht → Auto-Antwort, Rabatt, oder Eskalation an dich
+- `message_handler.py` - Käufer-Nachricht/Angebot → Auto-Antwort, Rabatt, oder Eskalation an dich
 - `likes.py` - Like-Event → automatische Rabatt-Nachricht
 - `vinted_client.py` - Interface + In-Memory-Mock (kein echter Vinted-Zugriff)
 

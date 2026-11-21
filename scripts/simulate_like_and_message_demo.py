@@ -13,8 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from vintedautomate.claude_client import ClaudeClient
 from vintedautomate.likes import build_like_discount_message
-from vintedautomate.message_handler import handle_incoming_message
-from vintedautomate.models import IncomingMessage, ItemCondition, ListingFields
+from vintedautomate.message_handler import handle_incoming_message, handle_incoming_offer
+from vintedautomate.models import IncomingMessage, IncomingOffer, ItemCondition, ListingFields
 from vintedautomate.vinted_client import InMemoryMockVintedClient
 
 
@@ -29,7 +29,7 @@ def main() -> None:
             "Zustand sehr gut, kaum getragen, keine Flecken oder Löcher. "
             "Maße: Breite ca. 55cm, Länge ca. 68cm."
         ),
-        category="Damen > Pullover & Strickjacken",
+        category=["Damen", "Pullover & Strickjacken"],
         brand="Nike",
         size="M",
         color="Dunkelblau",
@@ -56,6 +56,14 @@ def main() -> None:
     print("\n--- Eingehende Nachricht: Rabattwunsch (hoch) ---")
     discount_msg = IncomingMessage(listing_id=listing.id, buyer_id="buyer-2", text="Würdest du auf 12€ runtergehen?")
     result = handle_incoming_message(listing, discount_msg, claude)
+    if result.escalate_to_seller:
+        print(f"ESKALATION an dich: {result.escalation_reason}")
+    else:
+        print(f"Auto-Antwort: {result.auto_reply_text} (Rabatt: {result.discount_offered_rate:.0%})")
+
+    print("\n--- Strukturiertes Preisangebot über 'Verhandeln' ---")
+    offer = IncomingOffer(listing_id=listing.id, buyer_id="buyer-3", offered_price_eur=14.0)
+    result = handle_incoming_offer(listing, offer, claude)
     if result.escalate_to_seller:
         print(f"ESKALATION an dich: {result.escalation_reason}")
     else:

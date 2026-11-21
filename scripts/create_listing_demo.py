@@ -49,9 +49,10 @@ def main() -> None:
 
     print(f"Listing erstellt (mock): {listing.id}\n")
     print(f"Titel: {fields.title}")
-    print(f"Kategorie: {fields.category}")
+    print(f"Kategorie: {' > '.join(fields.category)}")
     print(f"Marke: {fields.brand} | Größe: {fields.size} | Farbe: {fields.color}")
-    print(f"Zustand: {fields.condition.value} | Material: {fields.material}")
+    condition_label = fields.condition.value if fields.condition else "nicht angegeben"
+    print(f"Zustand: {condition_label} | Material: {fields.material}")
     print(f"Preis: {fields.price_eur:.2f} € ({price_guess.basis})")
     print(f"Mängel: {fields.flaws_disclosed or 'keine erkannt'}")
     print(f"\nBeschreibung:\n{fields.description}")

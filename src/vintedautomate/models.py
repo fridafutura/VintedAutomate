@@ -46,19 +46,42 @@ class PriceSuggestion:
     comps_used: int
 
 
+# Top-level Vinted categories, as seen in the "Artikel verkaufen" form's
+# category picker. The list may not be exhaustive (the picker was scrolled),
+# but this is real UI, not a guess - keep it in sync if Vinted changes it.
+VINTED_TOP_LEVEL_CATEGORIES = [
+    "Damen",
+    "Herren",
+    "Kinder",
+    "Home",
+    "Elektronik",
+    "Bücher & andere Medien",
+    "Hobby- & Sammlerartikel",
+]
+
+
 @dataclass
 class ListingFields:
-    """All fields that go into a Vinted listing."""
+    """All fields that go into a Vinted listing.
+
+    `category` is a path through Vinted's hierarchical category picker, e.g.
+    ["Damen", "Pullover & Strickjacken"], not a single free-text string.
+
+    brand/size/color/condition/material are shown in the real form only
+    after a category is picked, and which of them appear depends on the
+    category (clothing vs. books vs. electronics, ...). They stay optional
+    here for that reason, not because they're unimportant for clothing.
+    """
 
     title: str
     description: str
-    category: str
-    brand: str | None
-    size: str | None
-    color: str
-    condition: ItemCondition
-    material: str | None
+    category: list[str]
     price_eur: float
+    brand: str | None = None
+    size: str | None = None
+    color: str | None = None
+    condition: ItemCondition | None = None
+    material: str | None = None
     flaws_disclosed: list[str] = field(default_factory=list)
 
 
@@ -82,6 +105,18 @@ class IncomingMessage:
     listing_id: str
     buyer_id: str
     text: str
+    received_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class IncomingOffer:
+    """A structured price offer submitted through Vinted's own "Verhandeln"
+    flow - a concrete number, not free text. Distinct from IncomingMessage:
+    no intent classification needed, the amount is already explicit."""
+
+    listing_id: str
+    buyer_id: str
+    offered_price_eur: float
     received_at: datetime = field(default_factory=datetime.utcnow)
 
 
