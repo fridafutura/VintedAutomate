@@ -18,16 +18,22 @@ Confidence levels, to be honest about what's actually been verified:
   not page source), so run once with headless=False and watch before
   trusting it unattended. The official "Vinted" system/marketing account
   that also appears in the inbox is filtered out.
-- `get_new_likes`/`update_price`: still NotImplementedError. No "X liked
-  your item" notification has been seen yet (unclear if Vinted even
-  surfaces that to sellers, vs. only a heart-count on the item itself -
-  worth confirming). No accept/decline affordance on a pending incoming
-  offer has been seen either (the offers shown so far were old/resolved
-  ones) - a screenshot of an *active, unanswered* offer would unblock this.
+- `get_new_likes`: confirmed via the notification bell ("{buyer} hat deinen
+  Artikel {item} favorisiert.").
+- `scan_my_listings`/`get_registered_listing`: confirmed via a screenshot of
+  the seller's own "Angebote" profile tab (per-item Ansichten/Favoriten/
+  Preis). This is what resolves a listing's title to its current price for
+  the discount engine - still an educated-guess selector for the actual
+  card/profile-link markup, verify live.
+- `update_price`: still NotImplementedError. No accept/decline affordance on
+  a pending incoming offer has been seen (the offers shown so far were
+  old/resolved ones) - a screenshot of an *active, unanswered* offer would
+  unblock this.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import random
@@ -38,7 +44,7 @@ from pathlib import Path
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 from .config import DEFAULT_RULES, DEFAULT_TIMING, AutomationTiming, BusinessRules
-from .models import IncomingMessage, IncomingOffer, Listing, ListingFields
+from .models import IncomingMessage, IncomingOffer, ItemCondition, Listing, ListingFields
 
 logger = logging.getLogger("vintedautomate.playwright_client")
 
@@ -163,6 +169,8 @@ class VintedPlaywrightClient:
             _human_delay(1, 2)
             logger.info("Listing '%s' -> %s", fields.title, status)
 
+            self._register_listing_fields(fields)
+
             # Vinted assigns the real item id; without the post-submit page
             # confirmed, fall back to a locally-generated placeholder id.
             return Listing(id=f"pending-{int(time.time())}", fields=fields)
@@ -179,6 +187,104 @@ class VintedPlaywrightClient:
 
     def _save_json_state(self, path: Path, state: dict) -> None:
         path.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+
+    # --- "My listings" registry: resolves a listing's title to its current
+    # price (and, where available, its full fields) so the discount engine
+    # has something to compute against. Two sources feed it:
+    # 1. publish_listing() saves full fields here right after posting.
+    # 2. scan_my_listings() reads the real "Angebote" tab on your own profile
+    #    (confirmed via screenshot: shows Ansichten/Favoriten/Preis per card)
+    #    and overwrites price/favorites with the live numbers - the source of
+    #    truth, since a price can change by hand or via an accepted offer.
+    # A listing posted outside this tool (or before this feature existed)
+    # will show up with price+favorites but no full fields - good enough for
+    # likes.build_like_discount_message / handle_incoming_offer (price-only),
+    # weaker for handle_incoming_message's question-answering (needs the
+    # description), which is the known quality gap for such listings.
+
+    @property
+    def _registry_path(self) -> Path:
+        return self.session_path.parent / "my_listings.json"
+
+    def _register_listing_fields(self, fields: ListingFields) -> None:
+        registry = self._load_json_state(self._registry_path)
+        entry = registry.get(fields.title, {})
+        entry["price_eur"] = fields.price_eur
+        entry["fields"] = dataclasses.asdict(fields)
+        registry[fields.title] = entry
+        self._save_json_state(self._registry_path, registry)
+
+    def get_registered_listing(self, title: str) -> Listing | None:
+        registry = self._load_json_state(self._registry_path)
+        entry = registry.get(title)
+        if entry is None:
+            return None
+        if entry.get("fields"):
+            data = dict(entry["fields"])
+            data["price_eur"] = entry.get("price_eur", data["price_eur"])
+            if data.get("condition"):
+                data["condition"] = ItemCondition(data["condition"])
+            fields = ListingFields(**data)
+        else:
+            fields = ListingFields(
+                title=title,
+                description="",
+                category_top_level="",
+                category_search_term="",
+                price_eur=entry.get("price_eur", DEFAULT_RULES.min_price_eur),
+            )
+        return Listing(id=title, fields=fields)
+
+    def scan_my_listings(self) -> list[tuple[str, float, int]]:
+        """Reads your own "Angebote" tab, updates the registry's live price/
+        favorites, and returns (title, price_eur, favorites) for each."""
+        page = self._page()
+        try:
+            page.goto("https://www.vinted.de/", wait_until="domcontentloaded")
+            _human_delay(1, 2)
+            # Best-effort: profile link in the header - verify live.
+            profile_link = page.locator("a[href*='/member/']").first
+            if profile_link.count():
+                profile_link.click()
+            else:
+                logger.warning("Profil-Link nicht gefunden - scan_my_listings() liefert nichts")
+                return []
+            _human_delay(1, 2)
+
+            angebote_tab = page.get_by_text("Angebote", exact=True)
+            if angebote_tab.count():
+                angebote_tab.first.click()
+                _human_delay(0.5, 1.5)
+
+            registry = self._load_json_state(self._registry_path)
+            results: list[tuple[str, float, int]] = []
+
+            cards = page.locator("a[href*='/items/']")
+            for i in range(cards.count()):
+                card = cards.nth(i)
+                text = card.inner_text()
+
+                price_match = _PRICE_RE.search(text)
+                favorites_match = re.search(r"(\d+)\s*Favoriten", text)
+                if price_match is None:
+                    continue
+
+                img = card.locator("img").first
+                title = (img.get_attribute("alt") if img.count() else None) or text.split("\n")[0]
+
+                price_eur = float(price_match.group(1).replace(",", "."))
+                favorites = int(favorites_match.group(1)) if favorites_match else 0
+
+                entry = registry.get(title, {})
+                entry["price_eur"] = price_eur
+                entry["favorites"] = favorites
+                registry[title] = entry
+                results.append((title, price_eur, favorites))
+
+            self._save_json_state(self._registry_path, registry)
+            return results
+        finally:
+            page.close()
 
     # --- Likes ("favorisiert"): confirmed via the notification bell, whose
     # entries read "{buyer} hat deinen Artikel {item} favorisiert." ---

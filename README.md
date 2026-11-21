@@ -161,6 +161,24 @@ Vinted-Sessions laufen irgendwann ab. Der Agent erkennt das (`is_logged_in()`)
 und loggt eine klare Fehlermeldung statt sich falsch zu verhalten. Dann einfach
 Schritt 1+4 wiederholen.
 
+### "Meine Angebote"-Register (Preis-Gap geschlossen)
+
+Deine "Angebote"-Profilseite zeigt pro Artikel Ansichten, **Favoriten** und
+Preis - das ist jetzt die Quelle der Wahrheit für `get_registered_listing()`.
+`publish_listing()` speichert zusätzlich die vollen Felder (Beschreibung,
+Marke, etc.) lokal, damit Fragen zu selbst erstellten Angeboten gut
+beantwortet werden können; für älter/anderswo erstellte Artikel gibt es nur
+Titel+Preis (Fragen-Beantwortung dort schwächer, Rabatt-Logik funktioniert
+trotzdem). `run_agent.py` ruft jetzt wirklich `build_like_discount_message`/
+`handle_incoming_message`/`handle_incoming_offer` auf und verschickt die
+Antwort über `send_message()` - mit Eskalationen in `escalations.jsonl`.
+
+**Verbleibende Lücke:** Bei einem angenommenen Preisangebot wird zwar die
+Antwort-Nachricht verschickt, aber `update_price()` (das eigentliche
+Angebot in Vinted bestätigen) ist noch nicht verdrahtet - das muss der
+Verkäufer nach wie vor von Hand im Posteingang bestätigen, bis ein
+Screenshot eines unbeantworteten Angebots das auflöst.
+
 ### Weitere Bestätigungen aus echten Screenshots
 
 - **Likes heißen "favorisiert"** bei Vinted. Erscheinen über die
