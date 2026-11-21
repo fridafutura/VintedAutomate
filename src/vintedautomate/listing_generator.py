@@ -19,15 +19,18 @@ wenig Nachfragen haben. Sei ehrlich bei Mängeln (Flecken, Abnutzung, fehlende T
 nenne sie konkret, beschönige nichts. Wenn du dir bei etwas (z.B. Marke, Material)
 nicht sicher bist, schreibe das vorsichtiger ("vermutlich", "ca.") statt es zu erfinden.
 
-Die Kategorie ist ein Pfad durch Vinteds Kategorie-Auswahl, nicht ein freier Text.
-Die oberste Ebene ist einer von: {", ".join(VINTED_TOP_LEVEL_CATEGORIES)}.
-Gib so viele weitere Ebenen wie plausibel an (z.B. ["Damen", "Pullover & Strickjacken"]).
+Für die Kategorie gib zwei Dinge an: die oberste Ebene (immer einer von:
+{", ".join(VINTED_TOP_LEVEL_CATEGORIES)}) und einen kurzen, präzisen Suchbegriff
+für die genaue Unterkategorie (z.B. "Pullover", "Sneaker", "Jeans") - dieser
+Begriff wird später in Vinteds eigenes Kategorie-Suchfeld eingetippt, du musst
+also keine exakte Kategorie-Baumstruktur kennen, nur den treffendsten Begriff.
 
 Antworte NUR mit einem JSON-Objekt in diesem Format:
 {{
   "title": "kurzer, präziser Titel",
   "description": "vollständige Beschreibung inkl. Zustand, Passform, Maße falls erkennbar, Mängel",
-  "category": ["Damen", "Pullover & Strickjacken"],
+  "category_top_level": "z.B. 'Damen'",
+  "category_search_term": "z.B. 'Pullover'",
   "brand": "Marke oder null, wenn nicht erkennbar oder nicht zutreffend",
   "size": "Größe oder null, wenn nicht erkennbar oder nicht zutreffend",
   "color": "Hauptfarbe oder null, wenn nicht zutreffend",
@@ -63,15 +66,17 @@ def generate_listing(
         except ValueError:
             condition = ItemCondition.GOOD
 
-    category = data.get("category") or []
-    if isinstance(category, str):
-        # Be lenient if the model ever replies with "Damen > Pullover" style text.
-        category = [part.strip() for part in category.split(">") if part.strip()]
+    category_top_level = data.get("category_top_level", "").strip()
+    if category_top_level not in VINTED_TOP_LEVEL_CATEGORIES:
+        # Model drifted from the known list; fall back to the closest-sounding
+        # one rather than erroring, the seller reviews this anyway.
+        category_top_level = category_top_level or VINTED_TOP_LEVEL_CATEGORIES[0]
 
     return ListingFields(
         title=data.get("title", "").strip(),
         description=data.get("description", "").strip(),
-        category=category,
+        category_top_level=category_top_level,
+        category_search_term=data.get("category_search_term", "").strip(),
         price_eur=price.suggested_price_eur,
         brand=data.get("brand") or None,
         size=data.get("size") or None,

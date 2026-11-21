@@ -105,7 +105,7 @@ def handle_incoming_message(
     condition_label = fields.condition.value if fields.condition else "nicht angegeben"
     context = (
         f"Artikel: {fields.title}\n"
-        f"Kategorie: {' > '.join(fields.category)}\n"
+        f"Kategorie: {fields.category_top_level} / {fields.category_search_term}\n"
         f"Beschreibung: {fields.description}\n"
         f"Marke: {fields.brand}, Größe: {fields.size}, Farbe: {fields.color}, "
         f"Zustand: {condition_label}, Material: {fields.material}\n"

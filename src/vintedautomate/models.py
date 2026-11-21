@@ -64,8 +64,17 @@ VINTED_TOP_LEVEL_CATEGORIES = [
 class ListingFields:
     """All fields that go into a Vinted listing.
 
-    `category` is a path through Vinted's hierarchical category picker, e.g.
-    ["Damen", "Pullover & Strickjacken"], not a single free-text string.
+    `category_top_level` is one of VINTED_TOP_LEVEL_CATEGORIES (the only part
+    of the category tree worth hardcoding - it's small and stable).
+
+    `category_search_term` is NOT a validated path through the rest of the
+    tree. Vinted's own category picker has a live search box ("Finde eine
+    Kategorie"), and the deeper tree is far too large and volatile to mirror
+    here (confirmed: it's effectively endless once you go past the top
+    level). Instead, this is the search phrase (e.g. "Pullover", "Sneaker")
+    that the future automation layer would type into that search box and
+    pick the best real suggestion from - so the actual category always
+    comes from Vinted live, never from a stale local copy.
 
     brand/size/color/condition/material are shown in the real form only
     after a category is picked, and which of them appear depends on the
@@ -75,7 +84,8 @@ class ListingFields:
 
     title: str
     description: str
-    category: list[str]
+    category_top_level: str
+    category_search_term: str
     price_eur: float
     brand: str | None = None
     size: str | None = None

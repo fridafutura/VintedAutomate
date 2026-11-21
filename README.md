@@ -30,10 +30,15 @@ Nachbau.
 ### Bestätigt aus echten Vinted-Screenshots
 
 - Das "Artikel verkaufen"-Formular ist: Fotos → Titel → Beschreibung →
-  Kategorie (hierarchische Auswahl, z.B. Damen → Pullover & Strickjacken) →
-  Preis. Felder wie Marke/Größe/Farbe/Zustand/Material tauchen erst nach der
-  Kategoriewahl auf und unterscheiden sich je nach Kategorie - deshalb sind
-  sie in `ListingFields` optional.
+  Kategorie → Preis. Felder wie Marke/Größe/Farbe/Zustand/Material tauchen
+  erst nach der Kategoriewahl auf und unterscheiden sich je nach Kategorie -
+  deshalb sind sie in `ListingFields` optional.
+- Die Kategorie-Baumstruktur unterhalb der 7 Top-Level-Kategorien ist zu groß
+  und veränderlich, um sie zu pflegen. Deshalb generiert `listing_generator.py`
+  nur `category_top_level` (einer der 7 bekannten) plus `category_search_term`
+  (z.B. "Pullover") - diesen Begriff würde die spätere Automatisierung in
+  Vinteds eigenes Kategorie-Suchfeld eintippen und den besten Live-Treffer
+  übernehmen, statt sich auf eine veraltete lokale Kategorie-Liste zu verlassen.
 - Vinted hat ein **eingebautes strukturiertes Preisangebot** ("Verhandeln"-
   Button auf der Artikelseite): Käufer geben eine konkrete Zahl ein, kein
   Freitext. Das ist ein eigener Kanal neben dem normalen Chat und wird in

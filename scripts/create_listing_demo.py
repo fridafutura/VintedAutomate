@@ -49,7 +49,7 @@ def main() -> None:
 
     print(f"Listing erstellt (mock): {listing.id}\n")
     print(f"Titel: {fields.title}")
-    print(f"Kategorie: {' > '.join(fields.category)}")
+    print(f"Kategorie: {fields.category_top_level} / {fields.category_search_term}")
     print(f"Marke: {fields.brand} | Größe: {fields.size} | Farbe: {fields.color}")
     condition_label = fields.condition.value if fields.condition else "nicht angegeben"
     print(f"Zustand: {condition_label} | Material: {fields.material}")

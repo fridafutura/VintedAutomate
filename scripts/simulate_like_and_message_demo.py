@@ -29,7 +29,8 @@ def main() -> None:
             "Zustand sehr gut, kaum getragen, keine Flecken oder Löcher. "
             "Maße: Breite ca. 55cm, Länge ca. 68cm."
         ),
-        category=["Damen", "Pullover & Strickjacken"],
+        category_top_level="Damen",
+        category_search_term="Pullover",
         brand="Nike",
         size="M",
         color="Dunkelblau",
