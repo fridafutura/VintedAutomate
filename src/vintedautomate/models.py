@@ -87,6 +87,7 @@ class ListingFields:
     category_top_level: str
     category_search_term: str
     price_eur: float
+    photo_paths: list[str] = field(default_factory=list)
     brand: str | None = None
     size: str | None = None
     color: str | None = None

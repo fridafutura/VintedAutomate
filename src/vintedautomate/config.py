@@ -26,6 +26,12 @@ class BusinessRules:
     # agent may go this far on its own, without asking the seller first.
     max_autonomous_discount_rate: float = 0.20
 
+    # Publishing a listing is a one-way, public action. By default the
+    # automation fills in everything but only saves it as a draft, so the
+    # seller gets one final look before it goes live. Flip this once the
+    # generated listings have proven reliable enough to trust fully.
+    auto_publish_listings: bool = False
+
     def __post_init__(self) -> None:
         if self.min_price_eur <= 0:
             raise ValueError("min_price_eur must be positive")
@@ -40,3 +46,25 @@ class BusinessRules:
 DEFAULT_RULES = BusinessRules()
 
 ANTHROPIC_MODEL = os.environ.get("VINTEDAUTOMATE_MODEL", "claude-sonnet-5-5")
+
+
+@dataclass(frozen=True)
+class AutomationTiming:
+    """Pacing for the real Vinted automation layer. Deliberately human-scale,
+    not "as fast as possible" - see README on account-ban risk."""
+
+    poll_interval_min_seconds: int = 10 * 60
+    poll_interval_max_seconds: int = 30 * 60
+
+    # Before sending any single message/offer-response, wait a random delay
+    # in this range, so replies don't look instantaneous.
+    reply_delay_min_seconds: int = 45
+    reply_delay_max_seconds: int = 20 * 60
+
+    # Hard stop: never run automated actions in this local hour range
+    # (keeps activity inside plausible "a person is awake" hours).
+    quiet_hours_start: int = 23
+    quiet_hours_end: int = 7
+
+
+DEFAULT_TIMING = AutomationTiming()

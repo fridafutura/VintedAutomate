@@ -89,9 +89,83 @@ python scripts/create_listing_demo.py foto1.jpg foto2.jpg \
 python scripts/simulate_like_and_message_demo.py
 ```
 
+## Deployment auf einem VPS (Hetzner)
+
+Entscheidung: dauerhaft laufender Teil auf einem kleinen gemieteten Server,
+da der heimische Laptop nicht durchgehend läuft (Details siehe Architektur-
+Diskussion). Empfehlung: **Hetzner Cloud**, Typ CX22 (2 vCPU, 4GB RAM - reicht
+für einen headless Chromium), Standort Nürnberg oder Falkenstein, ~4-5€/Monat.
+
+### 1. Login lokal vorbereiten (auf deinem eigenen Rechner, NICHT auf dem VPS)
+
+```bash
+pip install playwright
+playwright install chromium
+python scripts/bootstrap_login.py
+```
+
+Ein Browserfenster öffnet sich, du loggst dich normal bei Vinted ein (inkl.
+2FA/Captcha falls nötig), drückst dann Enter im Terminal. Das erzeugt
+`vinted_session.json` - das ist deine Login-Session, wie ein Passwort zu
+behandeln (landet nie in git, siehe `.gitignore`).
+
+### 2. Server anlegen
+
+1. Bei [hetzner.com/cloud](https://www.hetzner.com/cloud) Account anlegen.
+2. Neuen Server: CX22, Ubuntu 24.04, Standort Nürnberg/Falkenstein.
+3. SSH-Zugang einrichten (Hetzner führt dich durch SSH-Key-Upload).
+
+### 3. Server einrichten
+
+```bash
+ssh root@<server-ip>
+adduser --disabled-password --gecos "" vintedautomate
+apt update && apt install -y python3-venv git
+
+su - vintedautomate
+git clone <dein-repo-url> /opt/vintedautomate   # oder per scp hochladen
+cd /opt/vintedautomate
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/playwright install --with-deps chromium
+```
+
+### 4. Session + API-Key übertragen
+
+Von deinem lokalen Rechner aus:
+
+```bash
+scp vinted_session.json root@<server-ip>:/opt/vintedautomate/vinted_session.json
+```
+
+Auf dem Server, `.env` anlegen (wird vom systemd-Service geladen):
+
+```bash
+echo "ANTHROPIC_API_KEY=sk-ant-..." > /opt/vintedautomate/.env
+chown vintedautomate:vintedautomate /opt/vintedautomate/.env /opt/vintedautomate/vinted_session.json
+chmod 600 /opt/vintedautomate/.env /opt/vintedautomate/vinted_session.json
+```
+
+### 5. Als Dienst einrichten (läuft dauerhaft, startet nach Neustart automatisch)
+
+```bash
+cp /opt/vintedautomate/vintedautomate.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now vintedautomate
+journalctl -u vintedautomate -f   # Logs live mitlesen
+```
+
+### Session erneuern
+
+Vinted-Sessions laufen irgendwann ab. Der Agent erkennt das (`is_logged_in()`)
+und loggt eine klare Fehlermeldung statt sich falsch zu verhalten. Dann einfach
+Schritt 1+4 wiederholen.
+
 ## Nächster Schritt
 
-Sobald die Logik sich im Alltag bewährt hat: Entscheidung über Laufzeitumgebung
-und Automatisierungsschicht treffen (siehe oben), dann `vinted_client.py` real
-implementieren, ohne dass sich an `pricing.py`, `discounts.py`,
-`listing_generator.py` oder `message_handler.py` etwas ändern muss.
+`get_new_likes`, `get_new_messages`, `send_message` und `update_price` in
+`vinted_playwright_client.py` sind noch `NotImplementedError`-Platzhalter -
+die seitenseitige Posteingang/Benachrichtigungs-Oberfläche wurde noch nicht
+gezeigt. Sobald Screenshots davon da sind (Posteingang-Liste, eine Konversation
+mit einem eingegangenen Preisangebot, eine "jemand hat geliked"-Benachrichtigung
+falls es sowas gibt), werden diese gegen die echten Selektoren implementiert.

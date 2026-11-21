@@ -78,6 +78,7 @@ def generate_listing(
         category_top_level=category_top_level,
         category_search_term=data.get("category_search_term", "").strip(),
         price_eur=price.suggested_price_eur,
+        photo_paths=list(raw.photo_paths),
         brand=data.get("brand") or None,
         size=data.get("size") or None,
         color=(data.get("color") or None) and data["color"].strip(),
