@@ -52,11 +52,13 @@ class PriceSuggestion:
 VINTED_TOP_LEVEL_CATEGORIES = [
     "Damen",
     "Herren",
+    "Designerartikel",
     "Kinder",
     "Home",
     "Elektronik",
     "Bücher & andere Medien",
     "Hobby- & Sammlerartikel",
+    "Sport",
 ]
 
 

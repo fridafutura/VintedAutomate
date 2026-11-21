@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .models import IncomingMessage, Listing, ListingFields
+from .models import IncomingMessage, IncomingOffer, Listing, ListingFields
 
 
 class VintedClient(Protocol):
@@ -22,6 +22,10 @@ class VintedClient(Protocol):
         ...
 
     def get_new_messages(self) -> list[IncomingMessage]: ...
+
+    def get_new_offers(self) -> list[IncomingOffer]:
+        """Structured "Verhandeln" price offers, distinct from free-text messages."""
+        ...
 
     def send_message(self, listing_id: str, buyer_id: str, text: str) -> None: ...
 
@@ -37,6 +41,7 @@ class InMemoryMockVintedClient:
         self._sent_messages: list[tuple[str, str, str]] = []
         self._pending_likes: list[tuple[str, str]] = []
         self._pending_messages: list[IncomingMessage] = []
+        self._pending_offers: list[IncomingOffer] = []
         self._next_id = 1
 
     def publish_listing(self, fields: ListingFields) -> Listing:
@@ -52,6 +57,9 @@ class InMemoryMockVintedClient:
     def simulate_message(self, message: IncomingMessage) -> None:
         self._pending_messages.append(message)
 
+    def simulate_offer(self, offer: IncomingOffer) -> None:
+        self._pending_offers.append(offer)
+
     def get_new_likes(self) -> list[tuple[str, str]]:
         likes, self._pending_likes = self._pending_likes, []
         return likes
@@ -59,6 +67,10 @@ class InMemoryMockVintedClient:
     def get_new_messages(self) -> list[IncomingMessage]:
         messages, self._pending_messages = self._pending_messages, []
         return messages
+
+    def get_new_offers(self) -> list[IncomingOffer]:
+        offers, self._pending_offers = self._pending_offers, []
+        return offers
 
     def send_message(self, listing_id: str, buyer_id: str, text: str) -> None:
         self._sent_messages.append((listing_id, buyer_id, text))

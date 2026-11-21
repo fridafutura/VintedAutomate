@@ -49,15 +49,22 @@ def run_one_cycle(client: VintedPlaywrightClient, claude: ClaudeClient) -> None:
         )
         return
 
+    # NOTE: get_new_likes/get_new_messages/get_new_offers identify a listing
+    # by its title (there's no local record of your active listings' current
+    # prices to run the discount engine against yet). Until there's a small
+    # "my listings" registry (populated when publish_listing runs, or by
+    # reading your own profile's item list), this loop can only detect and
+    # log these events - it can't yet compute a real discount or reply.
+    # That registry is the next concrete gap to close.
+
     try:
         likes = client.get_new_likes()
     except NotImplementedError as e:
         logger.info("Like-Abfrage noch nicht verdrahtet: %s", e)
         likes = []
 
-    for listing_id, buyer_id in likes:
-        # TODO once get_new_likes returns real Listing objects, not just ids.
-        logger.info("Like auf %s von %s - Rabatt-Nachricht folgt", listing_id, buyer_id)
+    for item_title, buyer_id in likes:
+        logger.info("Like auf '%s' von %s - Rabatt-Nachricht folgt, sobald Preis bekannt ist", item_title, buyer_id)
 
     try:
         messages = client.get_new_messages()
@@ -66,8 +73,18 @@ def run_one_cycle(client: VintedPlaywrightClient, claude: ClaudeClient) -> None:
         messages = []
 
     for message in messages:
-        # TODO: resolve message.listing_id to a real Listing once that's wired up.
-        logger.info("Neue Nachricht zu %s von %s: %r", message.listing_id, message.buyer_id, message.text)
+        logger.info("Neue Nachricht zu '%s' von %s: %r", message.listing_id, message.buyer_id, message.text)
+
+    try:
+        offers = client.get_new_offers()
+    except NotImplementedError as e:
+        logger.info("Angebots-Abfrage noch nicht verdrahtet: %s", e)
+        offers = []
+
+    for offer in offers:
+        logger.info(
+            "Neues Preisangebot zu '%s' von %s: %.2f €", offer.listing_id, offer.buyer_id, offer.offered_price_eur
+        )
 
 
 def main() -> None:

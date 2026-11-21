@@ -161,11 +161,38 @@ Vinted-Sessions laufen irgendwann ab. Der Agent erkennt das (`is_logged_in()`)
 und loggt eine klare Fehlermeldung statt sich falsch zu verhalten. Dann einfach
 Schritt 1+4 wiederholen.
 
+### Weitere Bestätigungen aus echten Screenshots
+
+- **Likes heißen "favorisiert"** bei Vinted. Erscheinen über die
+  Benachrichtigungs-Glocke als Text "{Käufer} hat deinen Artikel {Titel}
+  favorisiert. Unterbreite ein Angebot." - `get_new_likes()` erkennt das per
+  Textmuster.
+- **Posteingang**: Konversationsliste mit Vorschautext (letzte Nachricht,
+  oder ein Preis bei einem Angebot). Eigene Nachrichten erscheinen rechts/
+  dunkel, Käufer-Nachrichten links/hell mit Avatar. Ein eingegangenes
+  Preisangebot wird inline als Bubble mit neuem Preis neben durchgestrichenem
+  Altpreis dargestellt (z.B. "37,00 € ~~40,00 €~~") - `get_new_messages()`/
+  `get_new_offers()` unterscheiden danach. Das offizielle "Vinted"-System-
+  /Werbekonto taucht auch im Posteingang auf und wird rausgefiltert.
+
 ## Nächster Schritt
 
-`get_new_likes`, `get_new_messages`, `send_message` und `update_price` in
-`vinted_playwright_client.py` sind noch `NotImplementedError`-Platzhalter -
-die seitenseitige Posteingang/Benachrichtigungs-Oberfläche wurde noch nicht
-gezeigt. Sobald Screenshots davon da sind (Posteingang-Liste, eine Konversation
-mit einem eingegangenen Preisangebot, eine "jemand hat geliked"-Benachrichtigung
-falls es sowas gibt), werden diese gegen die echten Selektoren implementiert.
+Zwei Dinge fehlen noch für den vollen Kreislauf:
+
+1. **`update_price()`** (Angebot annehmen/ablehnen) ist noch `NotImplementedError` -
+   die gezeigten Preisangebote waren alle alt/bereits erledigt, ohne sichtbare
+   Annehmen/Ablehnen-Buttons. Ein Screenshot eines **aktuellen, noch
+   unbeantworteten** Angebots würde das freischalten.
+2. **"Eigene Angebote"-Register**: `get_new_likes`/`get_new_messages`/
+   `get_new_offers` identifizieren ein Listing nur über seinen Titel - es gibt
+   noch keine lokale Liste "meine aktiven Angebote mit aktuellem Preis", gegen
+   die die Rabatt-Engine rechnen könnte. `run_agent.py` erkennt Likes/
+   Nachrichten/Angebote aktuell nur und loggt sie, reagiert aber noch nicht
+   automatisch darauf. Diese Registrierung (z.B. beim `publish_listing`
+   gespeichert, oder durch Auslesen der eigenen Profil-Artikelliste) ist der
+   nächste konkrete Baustein.
+
+Alle Selektoren in `vinted_playwright_client.py` sind aus Screenshots
+abgeleitet, aber nie gegen die echte Seite ausgeführt (Playwright ist in
+dieser Cloud-Session nicht installierbar/testbar) - vor dem produktiven
+Einsatz einmal mit `headless=False` beobachten.
